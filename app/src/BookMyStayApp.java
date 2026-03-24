@@ -1,12 +1,14 @@
 import java.util.HashMap;
 import java.util.Map;
+import java.util.LinkedList;
+import java.util.Queue;
 
 /**
  * ============================================================
  * MAIN CLASS: BookMyStayApp 
  * ============================================================
- * Incremental Build: UC1 + UC2 + UC3 + UC4 (Room Search)
- * @version 4.1
+ * Incremental Build: UC1 - UC5 (Booking Request Queue)
+ * @version 5.1
  */
 
 // --- UC2: Room Domain Models ---
@@ -52,51 +54,66 @@ class RoomInventory {
     }
 }
 
-// --- UC4: Room Search Service (Read-Only) ---
-class RoomSearchService {
-    public void searchAvailableRooms(RoomInventory inventory, Room single, Room doubleRoom, Room suite) {
-        Map<String, Integer> availability = inventory.getRoomAvailability();
+// --- UC5: Reservation & Booking Queue ---
+class Reservation {
+    private String guestName;
+    private String roomType;
 
-        // Check and display only if availability > 0
-        if (availability.getOrDefault("Single Room", 0) > 0) {
-            System.out.println("Single Room:");
-            single.displayRoomDetails();
-            System.out.println("Available: " + availability.get("Single Room") + "\n");
-        }
+    public Reservation(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
+    }
 
-        if (availability.getOrDefault("Double Room", 0) > 0) {
-            System.out.println("Double Room:");
-            doubleRoom.displayRoomDetails();
-            System.out.println("Available: " + availability.get("Double Room") + "\n");
-        }
+    public String getGuestName() { return guestName; }
+    public String getRoomType() { return roomType; }
+}
 
-        if (availability.getOrDefault("Suite Room", 0) > 0) {
-            System.out.println("Suite Room:");
-            suite.displayRoomDetails();
-            System.out.println("Available: " + availability.get("Suite Room") + "\n");
-        }
+class BookingRequestQueue {
+    private Queue<Reservation> requestQueue;
+
+    public BookingRequestQueue() {
+        // LinkedList implements the Queue interface in Java
+        this.requestQueue = new LinkedList<>();
+    }
+
+    public void addRequest(Reservation reservation) {
+        requestQueue.add(reservation);
+        System.out.println("Booking request received for " + reservation.getGuestName() + 
+                           " (" + reservation.getRoomType() + ")");
+    }
+
+    public Queue<Reservation> getRequestQueue() {
+        return requestQueue;
     }
 }
 
 // --- Main Application ---
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // UC1: Welcome Header
+        // Header
         System.out.println("========================================");
         System.out.println("   Welcome to Book My Stay App");
-        System.out.println("   Version: 4.1");
+        System.out.println("   Version: 5.1");
         System.out.println("========================================\n");
 
-        // Initialize Objects
+        // Initialization
         RoomInventory inventory = new RoomInventory();
-        RoomSearchService searchService = new RoomSearchService();
-        
-        Room single = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suite = new SuiteRoom();
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
 
-        // UC4: Room Search Execution
-        System.out.println("Room Search\n");
-        searchService.searchAvailableRooms(inventory, single, doubleRoom, suite);
+        // UC5: Simulating Incoming Booking Requests
+        System.out.println("Booking Request Intake\n");
+
+        bookingQueue.addRequest(new Reservation("Alice", "Single Room"));
+        bookingQueue.addRequest(new Reservation("Bob", "Double Room"));
+        bookingQueue.addRequest(new Reservation("Charlie", "Suite Room"));
+
+        System.out.println("\nAll requests stored in FIFO order.");
+        System.out.println("Current Queue Size: " + bookingQueue.getRequestQueue().size());
+
+        // Display the queue contents to verify order
+        System.out.println("\nPending Requests in Queue:");
+        for (Reservation res : bookingQueue.getRequestQueue()) {
+            System.out.println("- " + res.getGuestName() + " wants a " + res.getRoomType());
+        }
     }
 }
