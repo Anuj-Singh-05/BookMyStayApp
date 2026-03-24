@@ -5,8 +5,8 @@ import java.util.Map;
  * ============================================================
  * MAIN CLASS: BookMyStayApp 
  * ============================================================
- * Incremental Build: UC1 + UC2 + UC3 (Centralized Inventory)
- * @version 3.1
+ * Incremental Build: UC1 + UC2 + UC3 + UC4 (Room Search)
+ * @version 4.1
  */
 
 // --- UC2: Room Domain Models ---
@@ -34,7 +34,6 @@ class SuiteRoom extends Room { public SuiteRoom() { super(3, 750, 5000.0); } }
 
 // --- UC3: Centralized Room Inventory ---
 class RoomInventory {
-    // Key -> Room Type Name, Value -> Available Count
     private Map<String, Integer> roomAvailability;
 
     public RoomInventory() {
@@ -43,7 +42,6 @@ class RoomInventory {
     }
 
     private void initializeInventory() {
-        // Centralizing setup instead of scattered variables
         roomAvailability.put("Single Room", 5);
         roomAvailability.put("Double Room", 3);
         roomAvailability.put("Suite Room", 2);
@@ -52,42 +50,53 @@ class RoomInventory {
     public Map<String, Integer> getRoomAvailability() {
         return roomAvailability;
     }
+}
 
-    public void updateAvailability(String roomType, int count) {
-        roomAvailability.put(roomType, count);
+// --- UC4: Room Search Service (Read-Only) ---
+class RoomSearchService {
+    public void searchAvailableRooms(RoomInventory inventory, Room single, Room doubleRoom, Room suite) {
+        Map<String, Integer> availability = inventory.getRoomAvailability();
+
+        // Check and display only if availability > 0
+        if (availability.getOrDefault("Single Room", 0) > 0) {
+            System.out.println("Single Room:");
+            single.displayRoomDetails();
+            System.out.println("Available: " + availability.get("Single Room") + "\n");
+        }
+
+        if (availability.getOrDefault("Double Room", 0) > 0) {
+            System.out.println("Double Room:");
+            doubleRoom.displayRoomDetails();
+            System.out.println("Available: " + availability.get("Double Room") + "\n");
+        }
+
+        if (availability.getOrDefault("Suite Room", 0) > 0) {
+            System.out.println("Suite Room:");
+            suite.displayRoomDetails();
+            System.out.println("Available: " + availability.get("Suite Room") + "\n");
+        }
     }
 }
 
 // --- Main Application ---
 public class BookMyStayApp {
     public static void main(String[] args) {
-        // UC1: Welcome
+        // UC1: Welcome Header
         System.out.println("========================================");
         System.out.println("   Welcome to Book My Stay App");
-        System.out.println("   Version: 3.1");
+        System.out.println("   Version: 4.1");
         System.out.println("========================================\n");
 
-        // UC3: Inventory Initialization
-        System.out.println("Hotel Room Inventory Status\n");
-        
+        // Initialize Objects
         RoomInventory inventory = new RoomInventory();
+        RoomSearchService searchService = new RoomSearchService();
         
-        // Initializing Room Objects for their details
         Room single = new SingleRoom();
         Room doubleRoom = new DoubleRoom();
         Room suite = new SuiteRoom();
 
-        // Displaying status using the Centralized HashMap
-        System.out.println("Single Room:");
-        single.displayRoomDetails();
-        System.out.println("Available Rooms: " + inventory.getRoomAvailability().get("Single Room") + "\n");
-
-        System.out.println("Double Room:");
-        doubleRoom.displayRoomDetails();
-        System.out.println("Available Rooms: " + inventory.getRoomAvailability().get("Double Room") + "\n");
-
-        System.out.println("Suite Room:");
-        suite.displayRoomDetails();
-        System.out.println("Available Rooms: " + inventory.getRoomAvailability().get("Suite Room"));
+        // UC4: Room Search Execution
+        System.out.println("Room Search\n");
+        searchService.searchAvailableRooms(inventory, single, doubleRoom, suite);
     }
 }
