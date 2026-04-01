@@ -90,14 +90,17 @@ class BookingManager implements Serializable {
         System.out.println("UC10 Rollback: Room released for ID " + resId);
     }
 
-    // This method uses the field and removes the warning
+    // Updated UC10: Displaying logs without the "Unchecked cast" warning
     public void displayRollbackLogs() {
         System.out.println("\n--- Recently Released Room IDs (Stack LIFO) ---");
         if (rollbackStack.isEmpty()) {
             System.out.println("No recent rollbacks.");
         } else {
-            // We clone to avoid emptying the stack while viewing
-            Stack<String> tempStack = (Stack<String>) rollbackStack.clone();
+            // Modern approach: Create a new stack by passing the old one 
+            // This is type-safe and avoids the .clone() cast warning
+            Stack<String> tempStack = new Stack<>();
+            tempStack.addAll(rollbackStack);
+            
             while (!tempStack.isEmpty()) {
                 System.out.println("Returned to Pool: " + tempStack.pop());
             }
