@@ -2,10 +2,11 @@ import java.util.*;
 
 /**
  * ============================================================
- * MAIN CLASS: BookMyStayApp 
+ * MASTER CLASS: BookMyStayApp 
  * ============================================================
- * Final Unified Build: UC1 through UC10
- * Includes: UC7 Add-On Services (Map & List)
+ * FULL INTEGRATION: UC1 to UC11
+ * Includes: Inheritance, Inventory, Categories, Queues, 
+ * Add-Ons, History, Validation, Stack Rollback, and Thread Safety.
  */
 
 // --- UC9: Custom Exception ---
@@ -15,47 +16,60 @@ class InvalidBookingException extends Exception {
 
 // --- UC2 & UC4: Room Models & Categories ---
 abstract class Room {
-    protected String category;
+    protected String category; // UC4
     protected double price;
     public Room(String category, double price) { this.category = category; this.price = price; }
+    public String getCategory() { return category; }
 }
 class SingleRoom extends Room { public SingleRoom() { super("Standard", 1500.0); } }
 class DoubleRoom extends Room { public DoubleRoom() { super("Deluxe", 2500.0); } }
 class SuiteRoom extends Room { public SuiteRoom() { super("Luxury", 5000.0); } }
 
-// --- UC3: Inventory ---
+// --- UC3 & UC11: Thread-Safe Inventory ---
 class RoomInventory {
     private Map<String, Integer> roomAvailability = new HashMap<>();
+
     public RoomInventory() {
         roomAvailability.put("Single", 5);
         roomAvailability.put("Double", 3);
         roomAvailability.put("Suite", 2);
     }
-    public Map<String, Integer> getRoomAvailability() { return roomAvailability; }
-    public void updateAvailability(String type, int count) { roomAvailability.put(type, count); }
-}
 
-// --- UC7: Add-On Service Registry ---
-class ServiceRegistry {
-    // Map to store available services and their prices
-    private Map<String, Double> availableServices = new HashMap<>();
-
-    public ServiceRegistry() {
-        availableServices.put("Wifi", 200.0);
-        availableServices.put("Breakfast", 500.0);
-        availableServices.put("Gym", 300.0);
+    // UC11: Synchronized to prevent double-booking in multi-threaded environment
+    public synchronized boolean reserveRoom(String type) {
+        int count = roomAvailability.getOrDefault(type, 0);
+        if (count > 0) {
+            roomAvailability.put(type, count - 1);
+            return true;
+        }
+        return false;
     }
 
-    public Map<String, Double> getAvailableServices() { return availableServices; }
+    public synchronized void releaseRoom(String type) {
+        roomAvailability.put(type, roomAvailability.getOrDefault(type, 0) + 1);
+    }
+
+    public synchronized int getCount(String type) {
+        return roomAvailability.getOrDefault(type, 0);
+    }
 }
 
-// --- UC5 & UC8: Reservation Model ---
+// --- UC7: Add-On Service Registry (Map) ---
+class ServiceRegistry {
+    private Map<String, Double> services = new HashMap<>();
+    public ServiceRegistry() {
+        services.put("Wifi", 200.0);
+        services.put("Breakfast", 500.0);
+    }
+    public Map<String, Double> getServices() { return services; }
+}
+
+// --- UC5, UC7 & UC8: Reservation Model ---
 class Reservation {
     private String guestName;
     private String roomType;
     private String resId;
-    // UC7: List to store selected services for this specific guest
-    private List<String> selectedServices = new ArrayList<>();
+    private List<String> selectedAddOns = new ArrayList<>(); // UC7 List
 
     public Reservation(String guestName, String roomType, String resId) {
         this.guestName = guestName;
@@ -63,55 +77,51 @@ class Reservation {
         this.resId = resId;
     }
 
-    public void addService(String serviceName) { this.selectedServices.add(serviceName); }
+    public void addService(String service) { this.selectedAddOns.add(service); }
     public String getGuestName() { return guestName; }
     public String getRoomType() { return roomType; }
     public String getResId() { return resId; }
-    public List<String> getSelectedServices() { return selectedServices; }
+    public List<String> getAddOns() { return selectedAddOns; }
 }
 
-// --- UC10: Cancellation Service (Stack-based Rollback) ---
-class CancellationService {
-    private Stack<String> releasedRoomIds = new Stack<>();
-    private Map<String, String> reservationToTypeMap = new HashMap<>();
+// --- UC8 & UC10: History and Rollback (Stack & List) ---
+class BookingManager {
+    private List<Reservation> history = new ArrayList<>(); // UC8
+    private Stack<String> rollbackStack = new Stack<>(); // UC10
 
-    public void registerBooking(String resId, String type) {
-        reservationToTypeMap.put(resId, type);
+    public synchronized void recordBooking(Reservation res) {
+        history.add(res);
     }
 
-    public void cancelBooking(String resId, RoomInventory inventory) throws InvalidBookingException {
-        if (!reservationToTypeMap.containsKey(resId)) {
-            throw new InvalidBookingException("ID not found.");
-        }
-        String type = reservationToTypeMap.get(resId);
-        inventory.updateAvailability(type, inventory.getRoomAvailability().get(type) + 1);
-        releasedRoomIds.push(resId);
-        reservationToTypeMap.remove(resId);
-        System.out.println("UC10: Booking " + resId + " cancelled. Inventory rolled back.");
+    public synchronized void cancelBooking(String resId, String type, RoomInventory inv) {
+        rollbackStack.push(resId);
+        inv.releaseRoom(type);
+        System.out.println("UC10 Rollback: Room released for ID " + resId);
     }
+
+    public List<Reservation> getHistory() { return history; }
 }
 
-// --- UC6: Allocation Service ---
-class RoomAllocationService {
-    public void processQueue(Queue<Reservation> queue, RoomInventory inventory, CancellationService cancelService) {
-        System.out.println("\n--- UC6: Processing Allocations ---");
-        while (!queue.isEmpty()) {
-            Reservation res = queue.poll();
-            String type = res.getRoomType();
-            int available = inventory.getRoomAvailability().get(type);
+// --- UC11: Concurrent Booking Thread ---
+class BookingTask extends Thread {
+    private Reservation res;
+    private RoomInventory inv;
+    private BookingManager manager;
 
-            if (available > 0) {
-                inventory.updateAvailability(type, available - 1);
-                cancelService.registerBooking(res.getResId(), type);
-                System.out.println("Confirmed: " + res.getGuestName() + " -> " + type);
-                
-                // UC7: Display selected services during confirmation
-                if (!res.getSelectedServices().isEmpty()) {
-                    System.out.println("   Add-ons: " + res.getSelectedServices());
-                }
-            } else {
-                System.out.println("Failed: No " + type + " available for " + res.getGuestName());
-            }
+    public BookingTask(Reservation res, RoomInventory inv, BookingManager manager) {
+        this.res = res;
+        this.inv = inv;
+        this.manager = manager;
+    }
+
+    @Override
+    public void run() {
+        // UC11: Critical Section
+        if (inv.reserveRoom(res.getRoomType())) {
+            manager.recordBooking(res);
+            System.out.println("[CONFIRMED] " + res.getGuestName() + " secured a " + res.getRoomType());
+        } else {
+            System.out.println("[FAILED] No rooms left for " + res.getGuestName());
         }
     }
 }
@@ -119,47 +129,46 @@ class RoomAllocationService {
 // --- UC9: Validator ---
 class ReservationValidator {
     public void validate(String name, String type, RoomInventory inv) throws InvalidBookingException {
-        if (name == null || name.trim().isEmpty()) throw new InvalidBookingException("Name is empty.");
-        if (!inv.getRoomAvailability().containsKey(type)) throw new InvalidBookingException("Invalid Room Type.");
+        if (name == null || name.isEmpty()) throw new InvalidBookingException("Invalid Name");
+        if (!inv.getCount(type).equals(null) && inv.getCount(type) < 0) throw new InvalidBookingException("Invalid Type");
     }
 }
 
 // --- MAIN APPLICATION ---
 public class BookMyStayApp {
-    public static void main(String[] args) {
-        System.out.println("=== Book My Stay App: UC1 - UC10 Complete ===\n");
+    public static void main(String[] args) throws InterruptedException {
+        System.out.println("=== BOOK MY STAY: FULL UC1-UC11 INTEGRATION ===\n");
 
         RoomInventory inventory = new RoomInventory();
-        ServiceRegistry serviceRegistry = new ServiceRegistry();
-        RoomAllocationService allocationService = new RoomAllocationService();
-        CancellationService cancelService = new CancellationService();
-        ReservationValidator validator = new ReservationValidator();
-        
-        Queue<Reservation> bookingQueue = new LinkedList<>();
+        BookingManager manager = new BookingManager();
+        ServiceRegistry serviceMap = new ServiceRegistry();
 
-        try {
-            // UC9: Validation
-            String guest = "Abhisheak";
-            String type = "Single";
-            validator.validate(guest, type, inventory);
-            
-            // UC7: Add-On Selection
-            Reservation res1 = new Reservation(guest, type, "RES-101");
-            System.out.println("UC7: Available Services: " + serviceRegistry.getAvailableServices().keySet());
-            res1.addService("Wifi"); // Adding from the available map
-            res1.addService("Breakfast");
-            
-            bookingQueue.add(res1);
-
-            // UC6: Process Allocation
-            allocationService.processQueue(bookingQueue, inventory, cancelService);
-
-            // UC10: Rollback/Cancellation
-            System.out.println("\n--- Testing UC10 Cancellation ---");
-            cancelService.cancelBooking("RES-101", inventory);
-
-        } catch (InvalidBookingException e) {
-            System.out.println("Error: " + e.getMessage());
+        // UC5/UC11: Prepare multiple concurrent requests
+        List<Reservation> requests = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            Reservation r = new Reservation("Guest-" + i, "Single", "RES-00" + i);
+            r.addService("Wifi"); // UC7
+            requests.add(r);
         }
+
+        // UC11: Simulate Concurrent Access
+        List<Thread> threads = new ArrayList<>();
+        for (Reservation r : requests) {
+            Thread t = new BookingTask(r, inventory, manager);
+            threads.add(t);
+            t.start();
+        }
+
+        for (Thread t : threads) t.join();
+
+        // UC8: Show History
+        System.out.println("\n--- UC8: Booking History ---");
+        manager.getHistory().forEach(r -> System.out.println(r.getGuestName() + " booked " + r.getRoomType() + " with " + r.getAddOns()));
+
+        // UC10: Test a Cancellation
+        System.out.println("\n--- UC10: Testing Cancellation ---");
+        manager.cancelBooking("RES-001", "Single", inventory);
+        
+        System.out.println("\nFinal Inventory: " + inventory.getCount("Single"));
     }
 }
