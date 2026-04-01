@@ -77,9 +77,33 @@ class Reservation implements Serializable {
 class BookingManager implements Serializable {
     private static final long serialVersionUID = 1L;
     private List<Reservation> history = new ArrayList<>();
-    private transient Stack<String> rollbackStack = new Stack<>(); // Transient = not saved to file
+    // UC10: Stack for LIFO Rollback Tracking
+    private transient Stack<String> rollbackStack = new Stack<>(); 
 
-    public synchronized void recordBooking(Reservation res) { history.add(res); }
+    public synchronized void recordBooking(Reservation res) { 
+        history.add(res); 
+    }
+
+    public synchronized void cancelBooking(String resId, String type, RoomInventory inv) {
+        rollbackStack.push(resId); // Field is now used here
+        inv.releaseRoom(type);
+        System.out.println("UC10 Rollback: Room released for ID " + resId);
+    }
+
+    // This method uses the field and removes the warning
+    public void displayRollbackLogs() {
+        System.out.println("\n--- Recently Released Room IDs (Stack LIFO) ---");
+        if (rollbackStack.isEmpty()) {
+            System.out.println("No recent rollbacks.");
+        } else {
+            // We clone to avoid emptying the stack while viewing
+            Stack<String> tempStack = (Stack<String>) rollbackStack.clone();
+            while (!tempStack.isEmpty()) {
+                System.out.println("Returned to Pool: " + tempStack.pop());
+            }
+        }
+    }
+
     public List<Reservation> getHistory() { return history; }
 }
 
